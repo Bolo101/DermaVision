@@ -4,13 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.bolo101.dermavision.ui.theme.screens.CameraScreen
+import com.bolo101.dermavision.ui.theme.screens.HomeScreen
+import com.bolo101.dermavision.ui.theme.screens.ResultScreen
 import com.bolo101.dermavision.ui.theme.DermaVisionTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,29 +19,42 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             DermaVisionTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                DermaVisionApp()
             }
         }
     }
 }
 
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+fun DermaVisionApp() {
+    // navController = le GPS de l'app, il sait où on est et où aller
+    val navController = rememberNavController()
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    DermaVisionTheme {
-        Greeting("Android")
+    // NavHost = la carte de toutes les destinations possibles
+    NavHost(navController = navController, startDestination = "home") {
+
+        composable("home") {
+            HomeScreen(
+                onStartAnalysis = { navController.navigate("camera") }
+            )
+        }
+
+        composable("camera") {
+            CameraScreen(
+                onPhotoTaken = { navController.navigate("result") },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable("result") {
+            ResultScreen(
+                onNewAnalysis = {
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
     }
 }
