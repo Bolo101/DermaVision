@@ -1,23 +1,26 @@
 package com.bolo101.dermavision.ui.theme.screens
 
-import androidx.compose.foundation.background
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResultScreen(
+    imageUri: Uri?,           // URI de la photo reçue depuis CameraScreen
     onNewAnalysis: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -27,10 +30,7 @@ fun ResultScreen(
             title = { Text("Résultat") },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour"
-                    )
+                    Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Retour")
                 }
             }
         )
@@ -43,22 +43,20 @@ fun ResultScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-            // Zone image (placeholder, remplacée phase 3)
-            Box(
+            // ── Photo capturée ─────────────────────────────────────────────
+            // AsyncImage (Coil) charge et affiche l'image de façon asynchrone
+            // sans bloquer l'interface pendant le chargement
+            AsyncImage(
+                model = imageUri,
+                contentDescription = "Photo du grain de beauté",
+                contentScale = ContentScale.Crop,  // recadre pour remplir le cadre
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(240.dp)
-                    .background(Color(0xFF1C1C1C), RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Photo analysée\n(Phase 3)",
-                    color = Color.White.copy(alpha = 0.4f),
-                    textAlign = TextAlign.Center
-                )
-            }
+                    .height(280.dp)
+                    .clip(RoundedCornerShape(16.dp))
+            )
 
-            // Card résultat (placeholder, remplacée phase 4)
+            // ── Card résultat (placeholder — Phase 4 : IA) ────────────────
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
