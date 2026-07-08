@@ -47,12 +47,16 @@ fun ResultScreen(
         if (imageUri != null) {
             withContext(Dispatchers.IO) {
                 try {
+                    android.util.Log.d("DermaVision", "Étape 1 — URI reçue : $imageUri")
                     val classifier = Classifier(context)
-                    val result     = classifier.classify(imageUri)
+                    android.util.Log.d("DermaVision", "Étape 2 — Modèle chargé")
+                    val result = classifier.classify(imageUri)
+                    android.util.Log.d("DermaVision", "Étape 3 — Score : ${result.score}")
                     classifier.close()
                     state = AnalysisState.Success(result)
                 } catch (e: Exception) {
-                    state = AnalysisState.Error(e.message ?: "Erreur inconnue")
+                    android.util.Log.e("DermaVision", "ERREUR COMPLETE", e)
+                    state = AnalysisState.Error("${e.javaClass.simpleName}: ${e.message}")
                 }
             }
         }
