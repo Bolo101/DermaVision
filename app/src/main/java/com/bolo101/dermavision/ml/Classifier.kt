@@ -13,17 +13,15 @@ import java.nio.channels.FileChannel
 class Classifier(private val context: Context) {
 
     companion object {
-        private const val MODEL_FILE    = "dermavision.tflite"
-        private const val IMG_SIZE      = 224      // taille d'entrée d'EfficientNetB4
-        const val        THRESHOLD      = 0.35f    // seuil déterminé à la cellule 13b
-        private const val NUM_CHANNELS  = 3        // R, G, B
-        private const val BYTES_PER_FLOAT = 4      // float32 = 4 octets
+        private const val MODEL_FILE      = "dermavision.tflite"
+        private const val IMG_SIZE        = 224
+        const val        THRESHOLD        = 0.35f
+        private const val NUM_CHANNELS    = 3
+        private const val BYTES_PER_FLOAT = 4
     }
 
-    // lazy = le modèle est chargé seulement au premier appel de classify()
     private val interpreter: Interpreter by lazy { loadModel() }
 
-    // ── Chargement du modèle depuis les assets ─────────────────
     private fun loadModel(): Interpreter {
         val afd = context.assets.openFd(MODEL_FILE)
         val fileChannel = FileInputStream(afd.fileDescriptor).channel
@@ -32,58 +30,76 @@ class Classifier(private val context: Context) {
             afd.startOffset,
             afd.declaredLength
         )
-        return Interpreter(modelBuffer)
+        return Interpreter(modelBuffer, Interpreter.Options().apply {
+            setNumThreads(4)
+        })
     }
 
-    // ── Pipeline complet : URI → ClassificationResult ──────────
     fun classify(uri: Uri): ClassificationResult {
         val bitmap  = loadBitmapFromUri(uri)
-        val resized = Bitmap.createScaledBitmap(bitmap, IMG_SIZE, IMG_SIZE, true)
-        val input   = bitmapToByteBuffer(resized)
+        val scaled  = Bitmap.createScaledBitmap(bitmap, IMG_SIZE, IMG_SIZE, true)
+        val resized = scaled.copy(Bitmap.Config.ARGB_8888, false)
 
-        // Tableau de sortie : 1 image → 1 score sigmoid
+        android.util.Log.d("DermaVision", "Bitmap config: ${resized.config} ${resized.width}x${resized.height}")
+
+        val input = bitmapToByteBuffer(resized)
+
+        android.util.Log.d("DermaVision", "Buffer position avant run: ${input.position()} remaining: ${input.remaining()}")
+
+        // Lecture absolue — vérifie les données sans bouger la position
+        val r0 = input.getFloat(0)
+        val g0 = input.getFloat(4)
+        val b0 = input.getFloat(8)
+        android.util.Log.d("DermaVision", "Premier pixel RGB: R=$r0 G=$g0 B=$b0")
+
         val output = Array(1) { FloatArray(1) }
         interpreter.run(input, output)
 
         val score = output[0][0]
+        android.util.Log.d("DermaVision", "Score brut: $score")
+
         return ClassificationResult(score, score >= THRESHOLD)
     }
 
-    // ── Chargement de l'image depuis l'URI ─────────────────────
     private fun loadBitmapFromUri(uri: Uri): Bitmap {
-        // file:// = image dans le cache interne → accès direct
-        // content:// = accès via ContentResolver
+        val options = BitmapFactory.Options().apply {
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
         return if (uri.scheme == "file") {
-            BitmapFactory.decodeFile(uri.path)
-                ?: throw IllegalArgumentException("Image illisible : ${uri.path}")
+            BitmapFactory.decodeFile(uri.path, options)
+                ?: throw IllegalArgumentException("Image illisible: ${uri.path}")
         } else {
             context.contentResolver.openInputStream(uri).use { stream ->
-                BitmapFactory.decodeStream(stream)
-                    ?: throw IllegalArgumentException("Image illisible : $uri")
+                BitmapFactory.decodeStream(stream, null, options)
+                    ?: throw IllegalArgumentException("Image illisible: $uri")
             }
         }
     }
 
-    // ── Conversion Bitmap → ByteBuffer ─────────────────────────
     private fun bitmapToByteBuffer(bitmap: Bitmap): ByteBuffer {
-        // Taille : 1 image × 224px × 224px × 3 canaux × 4 octets
+        val bufferSize = 1 * IMG_SIZE * IMG_SIZE * NUM_CHANNELS * BYTES_PER_FLOAT
         val buffer = ByteBuffer
-            .allocateDirect(1 * IMG_SIZE * IMG_SIZE * NUM_CHANNELS * BYTES_PER_FLOAT)
+            .allocateDirect(bufferSize)
             .also { it.order(ByteOrder.nativeOrder()) }
 
         val pixels = IntArray(IMG_SIZE * IMG_SIZE)
         bitmap.getPixels(pixels, 0, IMG_SIZE, 0, 0, IMG_SIZE, IMG_SIZE)
 
+        val nonZero = pixels.count { it != 0 }
+        android.util.Log.d("DermaVision", "Pixels non-nuls: $nonZero / ${pixels.size}")
+
         for (pixel in pixels) {
-            // On passe les valeurs brutes [0, 255] — EfficientNetB4
-            // gère son propre preprocessing en interne (identique à l'entraînement)
-            buffer.putFloat(((pixel shr 16) and 0xFF).toFloat())  // Rouge
-            buffer.putFloat(((pixel shr  8) and 0xFF).toFloat())  // Vert
-            buffer.putFloat(( pixel         and 0xFF).toFloat())  // Bleu
+            buffer.putFloat(((pixel shr 16) and 0xFF).toFloat())
+            buffer.putFloat(((pixel shr  8) and 0xFF).toFloat())
+            buffer.putFloat(( pixel         and 0xFF).toFloat())
         }
+
+        buffer.rewind()
+
+        android.util.Log.d("DermaVision", "Buffer après rewind: position=${buffer.position()} remaining=${buffer.remaining()} attendu=$bufferSize")
+
         return buffer
     }
 
-    // Libère la mémoire du modèle quand on a fini
     fun close() = interpreter.close()
 }
