@@ -94,7 +94,7 @@ class Classifier(private val context: Context) {
             buffer.putFloat(( pixel         and 0xFF).toFloat())
         }
 
-        buffer.rewind()
+        buffer.rewind() //flush image buffer
 
         android.util.Log.d("DermaVision", "Buffer après rewind: position=${buffer.position()} remaining=${buffer.remaining()} attendu=$bufferSize")
 
