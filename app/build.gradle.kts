@@ -41,7 +41,7 @@ android {
 
     packaging {
         jniLibs {
-            pickFirsts += setOf("**/libtensorflowlite*.so")
+            pickFirsts += setOf("**/libtensorflowlite*.so","**/libtflite_flex*.so" )
         }
     }
 }
@@ -74,6 +74,7 @@ dependencies {
     // TFLite 2.5.0 — dernière version AVANT la séparation tensorflow-lite-api
     // → pas de conflit de namespace, pas de problème InterpreterApi
     implementation("org.tensorflow:tensorflow-lite:2.5.0")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.5.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
